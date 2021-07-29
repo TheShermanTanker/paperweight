@@ -31,6 +31,7 @@ import io.papermc.paperweight.util.*
 import io.papermc.paperweight.util.constants.*
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.stream.Collectors
 import kotlin.io.path.*
 import org.gradle.api.Project
 import org.gradle.jvm.toolchain.JavaToolchainService
@@ -361,7 +362,7 @@ class UserdevSetup(
         }
 
     private fun hashDirectory(dir: Path): String =
-        Files.walk(dir).use { stream -> hashFiles(stream.filter { it.isRegularFile() }.toList()) }
+        Files.walk(dir).use { stream -> hashFiles(stream.filter { it.isRegularFile() }.collect(Collectors.toList())) }
 
     private fun download(
         downloadName: String,
