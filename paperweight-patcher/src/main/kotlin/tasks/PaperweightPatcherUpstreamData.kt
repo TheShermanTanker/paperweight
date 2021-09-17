@@ -32,6 +32,9 @@ import kotlin.io.path.*
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.initialization.dsl.ScriptHandler
+import org.gradle.api.internal.BuildDefinition
+import org.gradle.api.internal.GradleInternal
 import org.gradle.api.internal.StartParameterInternal
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.tasks.Input
@@ -39,7 +42,11 @@ import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
+import org.gradle.internal.build.BuildState
+import org.gradle.internal.build.BuildStateRegistry
 import org.gradle.internal.build.NestedRootBuildRunner
+import org.gradle.internal.build.PublicBuildPath
+
 
 abstract class PaperweightPatcherUpstreamData : DefaultTask() {
 
@@ -76,7 +83,43 @@ abstract class PaperweightPatcherUpstreamData : DefaultTask() {
 
             params.systemPropertiesArgs[PAPERWEIGHT_DEBUG] = System.getProperty(PAPERWEIGHT_DEBUG, "false")
 
-            NestedRootBuildRunner.runNestedRootBuild(null, params as StartParameterInternal, services)
+            /**
+             * Injector start: Inline runNestedRootBuild and createNestedBuildTree to get more control
+             * over the upstream build
+             *
+             * This is largely achieved through exposing the BuildTreeLifecycleController object
+             */
+            val fromBuild = services.get(PublicBuildPath::class.java)
+            val buildDefinition = BuildDefinition.fromStartParameter(params as StartParameterInternal, fromBuild)
+
+            val currentBuild: BuildState = services.get(BuildState::class.java)
+
+            val buildStateRegistry = services.get(BuildStateRegistry::class.java)
+            val buildTree = buildStateRegistry.addNestedBuildTree(buildDefinition, currentBuild, null)
+
+            var paperweightVersion: String? = null
+
+            project.buildscript.configurations.getByName(ScriptHandler::CLASSPATH_CONFIGURATION.get()).resolvedConfiguration.firstLevelModuleDependencies.forEach {
+                if(it.name.contains("io.papermc.paperweight.patcher")) {
+                    paperweightVersion = it.moduleVersion
+                }
+            }
+
+            buildTree.run { buildController ->
+                buildController.gradle.settingsEvaluated {
+                    pluginManagement {
+                        resolutionStrategy {
+                            eachPlugin {
+                                if(requested.id.id == "io.papermc.paperweight.core" || requested.id.id == "io.papermc.paperweight.patcher") {
+                                    useVersion(paperweightVersion)
+                                }
+                            }
+                        }
+                        repositories.addAll((project.gradle as GradleInternal).settings.pluginManagement.repositories)
+                    }
+                }
+                buildController.scheduleAndRunTasks()
+            }
 
             val upstreamData = gson.fromJson<UpstreamData>(upstreamDataFile)
             val ourData = upstreamData.copy(reobfPackagesToFix = (upstreamData.reobfPackagesToFix ?: emptyList()) + reobfPackagesToFix.get())
