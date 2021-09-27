@@ -158,4 +158,20 @@ open class AllTasks(
 
         outputMappings.set(cache.resolve(PATCHED_REOBF_MOJANG_SPIGOT_MAPPINGS))
     }
+
+    val cloneBuildData by tasks.registering<CloneBuildData>()
+
+    @Suppress("unused")
+    val generateMergedMappings by tasks.registering<GenerateMergedMappings> {
+        vanillaJar.set(filterVanillaJar.flatMap { it.outputJar })
+        libraries.from(downloadMcLibraries.map { it.outputDir.asFileTree })
+
+        buildDataDir.set(cloneBuildData.flatMap { it.buildDataDir })
+        mojangYarnMappings.set(generateMappings.flatMap { it.outputMappings })
+        spigotClassMappingsPatch.set(extension.paper.additionalSpigotClassMappings.fileExists(project))
+        spigotMemberMappingsPatch.set(extension.paper.additionalSpigotMemberMappings.fileExists(project))
+
+        mergedMappings.set(cache.resolve(MOJANG_YARN_SPIGOT_MAPPINGS))
+        mojangToMergedMappings.set((cache.resolve(MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS)))
+    }
 }
