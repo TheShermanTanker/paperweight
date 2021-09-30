@@ -24,9 +24,6 @@ package io.papermc.paperweight.patcher.tasks
 
 import io.papermc.paperweight.util.*
 import io.papermc.paperweight.util.constants.*
-import kotlin.collections.emptyList
-import kotlin.collections.listOf
-import kotlin.collections.plus
 import kotlin.collections.set
 import kotlin.io.path.*
 import org.gradle.api.DefaultTask
@@ -97,21 +94,17 @@ abstract class PaperweightPatcherUpstreamData : DefaultTask() {
             val buildStateRegistry = services.get(BuildStateRegistry::class.java)
             val buildTree = buildStateRegistry.addNestedBuildTree(buildDefinition, currentBuild, null)
 
-            var paperweightVersion: String? = null
-
-            project.buildscript.configurations.getByName(ScriptHandler::CLASSPATH_CONFIGURATION.get()).resolvedConfiguration.firstLevelModuleDependencies.forEach {
-                if(it.name.contains("io.papermc.paperweight.patcher")) {
-                    paperweightVersion = it.moduleVersion
-                }
-            }
-
             buildTree.run { buildController ->
                 buildController.gradle.settingsEvaluated {
                     pluginManagement {
                         resolutionStrategy {
                             eachPlugin {
                                 if(requested.id.id == "io.papermc.paperweight.core" || requested.id.id == "io.papermc.paperweight.patcher") {
-                                    useVersion(paperweightVersion)
+                                    project.buildscript.configurations.getByName(ScriptHandler::CLASSPATH_CONFIGURATION.get()).resolvedConfiguration.firstLevelModuleDependencies.forEach {
+                                        if(it.name.contains("io.papermc.paperweight.patcher")) {
+                                            useVersion(it.moduleVersion)
+                                        }
+                                    }
                                 }
                             }
                         }
