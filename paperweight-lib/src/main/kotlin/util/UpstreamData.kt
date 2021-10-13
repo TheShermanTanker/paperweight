@@ -40,7 +40,11 @@ data class UpstreamData(
     val reobfPackagesToFix: List<String>?,
     val vanillaIncludes: List<String>,
     val paramMappings: MavenDep,
-    val accessTransform: Path
+    val accessTransform: Path,
+    val mergedMappings: Path,
+    val mojangToMergedMappings: Path,
+    val patchedMojangToMergedMappings: Path,
+    val remappedMergedSourcesJar: Path
 )
 
 fun readUpstreamData(inputFile: RegularFile): UpstreamData? {

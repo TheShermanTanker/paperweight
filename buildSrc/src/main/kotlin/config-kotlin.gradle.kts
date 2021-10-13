@@ -16,11 +16,17 @@ java {
 
 repositories {
     mavenCentral()
+    maven("https://maven.fabricmc.net/") {
+        mavenContent {
+            includeModule("net.fabricmc", "mercury")
+        }
+    }
+    /* Use Fabric instead of cadix for now
     maven("https://oss.sonatype.org/content/repositories/snapshots/") {
         mavenContent {
             includeModule("org.cadixdev", "mercury")
         }
-    }
+    }*/
     maven("https://maven.quiltmc.org/repository/release/") {
         mavenContent {
             includeGroup("org.quiltmc")

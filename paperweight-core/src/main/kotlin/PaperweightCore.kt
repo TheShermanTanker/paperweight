@@ -91,7 +91,7 @@ class PaperweightCore : Plugin<Project> {
             dependsOn(tasks.applyPatches)
             vanillaJar.set(tasks.downloadServerJar.flatMap { it.outputJar })
             remappedJar.set(tasks.copyResources.flatMap { it.outputJar })
-            decompiledJar.set(tasks.decompileJar.flatMap { it.outputJar })
+            decompiledJar.set(tasks.decompileJarMerged.flatMap { it.outputJar })
             mcVersion.set(target.ext.minecraftVersion)
             mcLibrariesFile.set(tasks.inspectVanillaJar.flatMap { it.serverLibraries })
             mcLibrariesDir.set(tasks.downloadMcLibraries.flatMap { it.outputDir })
@@ -104,6 +104,10 @@ class PaperweightCore : Plugin<Project> {
             paramMappingsUrl.set(ext.paramMappingsRepo)
             paramMappingsConfig.set(target.configurations.named(PARAM_MAPPINGS_CONFIG))
             atFile.set(tasks.mergeAdditionalAts.flatMap { it.outputFile })
+            mergedMappings.set(tasks.generateMergedMappings.flatMap { it.mergedMappings })
+            mojangToMergedMappings.set(tasks.generateMergedMappings.flatMap { it.mojangToMergedMappings })
+            patchedMojangToMergedMappings.set(tasks.patchMojangToMergedMappings.flatMap { it.outputMappings })
+            remappedMergedSourcesJar.set(tasks.remapSourcesMerged.flatMap { it.sourcesOutputZip })
 
             dataFile.set(
                 target.layout.file(
@@ -145,7 +149,7 @@ class PaperweightCore : Plugin<Project> {
                 inputJar.set(serverProj.tasks.named("shadowJar", Jar::class).flatMap { it.archiveFile })
             }
 
-            val (_, reobfJar) = serverProj.setupServerProject(
+            val (_, _) = serverProj.setupServerProject(
                 target,
                 tasks.copyResources.flatMap { it.outputJar },
                 tasks.decompileJar.flatMap { it.outputJar },
@@ -158,7 +162,7 @@ class PaperweightCore : Plugin<Project> {
 
             val generatePaperclipPatch by target.tasks.registering<GeneratePaperclipPatch> {
                 originalJar.set(tasks.downloadServerJar.flatMap { it.outputJar })
-                patchedJar.set(reobfJar.flatMap { it.outputJar })
+                patchedJar.set(serverProj.tasks.named("shadowJar", Jar::class).flatMap { it.archiveFile })
                 mcVersion.set(target.ext.minecraftVersion)
             }
 

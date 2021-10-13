@@ -58,6 +58,10 @@ open class PaperweightPatcherExtension(private val objects: ObjectFactory, layou
     val decompileRepo: Property<String> = objects.property()
     val remapRepo: Property<String> = objects.property()
 
+    val spigotClassMappingsPatch: RegularFileProperty = objects.fileProperty().convention(buildDataDir.file("spigot-class-mappings-patch.csrg"))
+    val spigotMemberMappingsPatch: RegularFileProperty = objects.fileProperty().convention(buildDataDir.file("spigot-member-mappings-patch.csrg"))
+    val mergedMappingsPatch: RegularFileProperty = objects.fileProperty().convention(buildDataDir.file("merged-mappings-patch.tiny"))
+
     val upstreams: ExtensiblePolymorphicDomainObjectContainer<PatcherUpstream> = objects.polymorphicDomainObjectContainer(PatcherUpstream::class)
 
     /**

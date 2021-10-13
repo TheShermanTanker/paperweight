@@ -49,6 +49,10 @@ abstract class SimpleApplyGitPatches : ControllableOutputTask() {
     @get:InputDirectory
     abstract val patchDir: DirectoryProperty
 
+    @get:Optional
+    @get:InputFile
+    abstract val remappedSources: DirectoryProperty
+
     @get:Input
     abstract val bareDirectory: Property<Boolean>
 
@@ -117,6 +121,15 @@ abstract class SimpleApplyGitPatches : ControllableOutputTask() {
         git("config", "commit.gpgsign", "false").executeSilently()
 
         val srcDir = output.resolve("src/main/java")
+
+        if(remappedSources.pathOrNull != null) {
+            srcDir.deleteRecursively()
+            srcDir.createDirectories()
+            fs.copy {
+                from(archives.zipTree(remappedSources.path))
+                into(srcDir)
+            }
+        }
 
         val patches = patchDir.pathOrNull?.listDirectoryEntries("*.patch") ?: listOf()
 

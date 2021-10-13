@@ -76,6 +76,18 @@ abstract class PaperweightCoreUpstreamData : DefaultTask() {
     @get:InputFile
     abstract val sourceMappings: RegularFileProperty
 
+    @get:InputFile
+    abstract val mergedMappings: RegularFileProperty
+
+    @get:InputFile
+    abstract val mojangToMergedMappings: RegularFileProperty
+
+    @get:InputFile
+    abstract val patchedMojangToMergedMappings: RegularFileProperty
+
+    @get:InputFile
+    abstract val remappedMergedSourcesJar: RegularFileProperty
+
     @get:Input
     abstract val reobfPackagesToFix: ListProperty<String>
 
@@ -114,7 +126,11 @@ abstract class PaperweightCoreUpstreamData : DefaultTask() {
             reobfPackagesToFix.get(),
             vanillaJarIncludes.get(),
             determineMavenDep(paramMappingsUrl, paramMappingsConfig),
-            atFile.path
+            atFile.path,
+            mergedMappings.path,
+            mojangToMergedMappings.path,
+            patchedMojangToMergedMappings.path,
+            remappedMergedSourcesJar.path
         )
         dataFilePath.bufferedWriter(Charsets.UTF_8).use { writer ->
             gson.toJson(data, writer)

@@ -48,19 +48,6 @@ val tinyRemapperArgsList: List<String> = listOf(
     "--rebuildsourcefilenames"
 )
 
-val fallbackTinyRemapperArgsList: List<String> = listOf(
-    "{input}",
-    "{output}",
-    "{mappings}",
-    "{from}",
-    "{to}",
-    "{classpath}",
-    "--fix-package-access",
-    "--rename-invalid-locals",
-    "--threads=1",
-    "--rebuild-source-filenames"
-)
-
 private fun List<String>.createTinyRemapperArgs(
     input: String,
     output: String,
@@ -156,36 +143,19 @@ abstract class RemapJar : JavaLauncherTask() {
     @TaskAction
     fun run() {
         val logFile = layout.cache.resolve(paperTaskOutput("log"))
-        try {
-            runTinyRemapper(
-                tinyRemapperArgsList,
-                logFile,
-                inputJar.path,
-                mappingsFile.path,
-                fromNamespace.get(),
-                toNamespace.get(),
-                remapClasspath.files.map { it.toPath() },
-                remapper,
-                outputJar.path,
-                launcher.get(),
-                layout.cache,
-                jvmargs.get()
-            )
-        } catch(exception: PaperweightException) { // Fallback if Tiny Remapper wants alternate args
-            runTinyRemapper(
-                fallbackTinyRemapperArgsList,
-                logFile,
-                inputJar.path,
-                mappingsFile.path,
-                fromNamespace.get(),
-                toNamespace.get(),
-                remapClasspath.files.map { it.toPath() },
-                remapper,
-                outputJar.path,
-                launcher.get(),
-                layout.cache,
-                jvmargs.get()
-            )
-        }
+        runTinyRemapper(
+            tinyRemapperArgsList,
+            logFile,
+            inputJar.path,
+            mappingsFile.path,
+            fromNamespace.get(),
+            toNamespace.get(),
+            remapClasspath.files.map { it.toPath() },
+            remapper,
+            outputJar.path,
+            launcher.get(),
+            layout.cache,
+            jvmargs.get()
+        )
     }
 }

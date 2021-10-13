@@ -73,6 +73,7 @@ const val PATCHED_REOBF_MOJANG_SPIGOT_MAPPINGS = "$MAPPINGS_DIR/mojang+yarn-spig
 
 const val MOJANG_YARN_SPIGOT_MAPPINGS = "$MAPPINGS_DIR/official-mojang+yarn+spigot.tiny"
 const val MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS = "$MAPPINGS_DIR/mojang+yarn-mojang+yarn+spigot.tiny"
+const val PATCHED_MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS = "$MAPPINGS_DIR/mojang+yarn-mojang+yarn+spigot-patched.tiny"
 
 const val OBF_NAMESPACE = "official"
 const val SPIGOT_NAMESPACE = "spigot"
@@ -89,7 +90,9 @@ private const val SETUP_CACHE = "$PAPER_PATH/setupCache"
 private const val TASK_CACHE = "$PAPER_PATH/taskCache"
 
 const val FINAL_REMAPPED_JAR = "$TASK_CACHE/minecraft.jar"
+const val FINAL_REMAPPED_MERGED_JAR = "$TASK_CACHE/minecraft-merged.jar"
 const val FINAL_DECOMPILE_JAR = "$TASK_CACHE/decompileJar.jar"
+const val FINAL_DECOMPILE_MERGED_JAR = "$TASK_CACHE/minecraft-decompiled.jar"
 
 const val MC_DEV_SOURCES_DIR = "$PAPER_PATH/mc-dev-sources"
 

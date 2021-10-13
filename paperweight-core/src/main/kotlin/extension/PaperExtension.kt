@@ -50,6 +50,10 @@ open class PaperExtension(objects: ObjectFactory, layout: ProjectLayout) {
     val reobfMappingsPatch: RegularFileProperty = objects.fileProperty()
     val mappingsPatch: RegularFileProperty = objects.fileProperty()
 
+    val spigotClassMappingsPatch: RegularFileProperty = objects.fileProperty().convention(buildDataDir.file("spigot-class-mappings-patch.csrg"))
+    val spigotMemberMappingsPatch: RegularFileProperty = objects.fileProperty().convention(buildDataDir.file("spigot-member-mappings-patch.csrg"))
+    val mergedMappingsPatch: RegularFileProperty = objects.fileProperty().convention(buildDataDir.file("merged-mappings-patch.tiny"))
+
     val craftBukkitPatchPatchesDir: DirectoryProperty = objects.directoryProperty()
     val spigotServerPatchPatchesDir: DirectoryProperty = objects.directoryProperty()
     val spigotApiPatchPatchesDir: DirectoryProperty = objects.directoryProperty()

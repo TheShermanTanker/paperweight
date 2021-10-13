@@ -36,7 +36,9 @@ import org.gradle.api.internal.StartParameterInternal
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import org.gradle.internal.build.BuildState
@@ -49,6 +51,18 @@ abstract class PaperweightPatcherUpstreamData : DefaultTask() {
 
     @get:InputDirectory
     abstract val projectDir: DirectoryProperty
+
+    @get:Optional
+    @get:InputFile
+    abstract val spigotClassMappingsPatch: RegularFileProperty
+
+    @get:Optional
+    @get:InputFile
+    abstract val spigotMemberMappingsPatch: RegularFileProperty
+
+    @get:Optional
+    @get:InputFile
+    abstract val mergedMappingsPatch: RegularFileProperty
 
     @get:Input
     abstract val reobfPackagesToFix: ListProperty<String>
@@ -70,6 +84,18 @@ abstract class PaperweightPatcherUpstreamData : DefaultTask() {
 
         val upstreamDataFile = createTempFile(dataFile.path.parent, "data", ".json")
         upstreamDataFile.deleteForcefully() // We won't be the ones to create this file
+
+        /**
+         * Until Paper implements passing data to upstream, we're on our own, and unfortunately
+         * this hack is the best we can do
+         */
+        val upstreamSpigotClassMappingsPatch = project.objects.fileFrom(project.objects.dirFrom(projectDir, "build-data"), "spigot-class-mappings-patch.csrg")
+        val upstreamSpigotMemberMappingsPatch = project.objects.fileFrom(project.objects.dirFrom(projectDir, "build-data"), "spigot-member-mappings-patch.csrg")
+        val upstreamMergedMappingsPatch = project.objects.fileFrom(project.objects.dirFrom(projectDir, "build-data"), "merged-mappings-patch.tiny")
+
+        spigotClassMappingsPatch.orNull?.asFile?.copyTo(target = upstreamSpigotClassMappingsPatch.get().asFile, overwrite = true)
+        spigotMemberMappingsPatch.orNull?.asFile?.copyTo(target = upstreamSpigotMemberMappingsPatch.get().asFile, overwrite = true)
+        mergedMappingsPatch.orNull?.asFile?.copyTo(target = upstreamMergedMappingsPatch.get().asFile, overwrite = true)
 
         try {
             params.setTaskNames(listOf(PAPERWEIGHT_PREPARE_DOWNSTREAM))

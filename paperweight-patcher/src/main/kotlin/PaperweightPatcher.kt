@@ -41,6 +41,7 @@ import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.Transformer
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.TaskProvider
@@ -114,11 +115,32 @@ class PaperweightPatcher : Plugin<Project> {
             for (upstream in patcher.upstreams) {
                 for (patchTask in upstream.patchTasks) {
                     patchTask.patchTask {
+                        if(patchTask.serverDir.get()) {
+                            remappedSources.convention(target, upstreamDataTask.mapUpstreamData { it.remappedMergedSourcesJar })
+                        }
                         sourceMcDevJar.convention(target, upstreamDataTask.mapUpstreamData { it.decompiledJar })
                         mcLibrariesDir.convention(target, upstreamDataTask.mapUpstreamData { it.libSourceDir })
                     }
                 }
             }
+
+            val mergedMappings: RegularFileProperty = objects.fileProperty()
+            val mojangToMergedMappings: RegularFileProperty = objects.fileProperty()
+            val patchedMojangToMergedMappings: RegularFileProperty = objects.fileProperty()
+            mergedMappings.set(target.layout.cache.resolve(MOJANG_YARN_SPIGOT_MAPPINGS))
+            mojangToMergedMappings.set(target.layout.cache.resolve(MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS))
+            patchedMojangToMergedMappings.set(target.layout.cache.resolve(PATCHED_MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS))
+
+            val upstreamMergedMappings: RegularFileProperty = objects.fileProperty()
+            val upstreamMojangToMergedMappings: RegularFileProperty = objects.fileProperty()
+            val upstreamPatchedMojangToMergedMappings: RegularFileProperty = objects.fileProperty()
+            upstreamMergedMappings.pathProvider(upstreamDataTask.mapUpstreamData { it.mergedMappings })
+            upstreamMojangToMergedMappings.pathProvider(upstreamDataTask.mapUpstreamData { it.mojangToMergedMappings })
+            upstreamPatchedMojangToMergedMappings.pathProvider(upstreamDataTask.mapUpstreamData { it.patchedMojangToMergedMappings })
+
+            upstreamMergedMappings.orNull?.asFile?.copyTo(target = mergedMappings.get().asFile, overwrite = true)
+            upstreamMojangToMergedMappings.orNull?.asFile?.copyTo(target = mojangToMergedMappings.get().asFile, overwrite = true)
+            upstreamPatchedMojangToMergedMappings.orNull?.asFile?.copyTo(target = patchedMojangToMergedMappings.get().asFile, overwrite = true)
 
             val upstreamData = upstreamDataTask.readUpstreamData()
             val serverProj = patcher.serverProject.forUseAtConfigurationTime().orNull ?: return@afterEvaluate
@@ -148,7 +170,7 @@ class PaperweightPatcher : Plugin<Project> {
                 paramMappingsUrl.set(upstreamData.map { it.paramMappings.url })
             }
 
-            val (_, reobfJar) = serverProj.setupServerProject(
+            val (_, _) = serverProj.setupServerProject(
                 target,
                 upstreamData.map { it.remappedJar },
                 upstreamData.map { it.decompiledJar },
@@ -161,7 +183,7 @@ class PaperweightPatcher : Plugin<Project> {
 
             val generatePaperclipPatch by target.tasks.registering<GeneratePaperclipPatch> {
                 originalJar.pathProvider(upstreamData.map { it.vanillaJar })
-                patchedJar.set(reobfJar.flatMap { it.outputJar })
+                patchedJar.set(serverProj.tasks.named("shadowJar", Jar::class).flatMap { it.archiveFile })
                 mcVersion.set(upstreamData.map { it.mcVersion })
             }
 
@@ -208,6 +230,9 @@ class PaperweightPatcher : Plugin<Project> {
                 dependsOn(cloneTask)
                 projectDir.convention(cloneTask.flatMap { it.outputDir })
                 reobfPackagesToFix.convention(ext.reobfPackagesToFix)
+                spigotClassMappingsPatch.set(ext.spigotClassMappingsPatch.fileExists(project))
+                spigotMemberMappingsPatch.set(ext.spigotMemberMappingsPatch.fileExists(project))
+                mergedMappingsPatch.set(ext.mergedMappingsPatch.fileExists(project))
             }
 
             return@let cloneTask

@@ -161,17 +161,61 @@ open class AllTasks(
 
     val cloneBuildData by tasks.registering<CloneBuildData>()
 
-    @Suppress("unused")
     val generateMergedMappings by tasks.registering<GenerateMergedMappings> {
         vanillaJar.set(filterVanillaJar.flatMap { it.outputJar })
         libraries.from(downloadMcLibraries.map { it.outputDir.asFileTree })
+        syntheticMethods.set(inspectVanillaJar.flatMap { it.syntheticMethods })
 
         buildDataDir.set(cloneBuildData.flatMap { it.buildDataDir })
         mojangYarnMappings.set(generateMappings.flatMap { it.outputMappings })
-        spigotClassMappingsPatch.set(extension.paper.additionalSpigotClassMappings.fileExists(project))
-        spigotMemberMappingsPatch.set(extension.paper.additionalSpigotMemberMappings.fileExists(project))
+        spigotClassMappingsPatch.set(extension.paper.spigotClassMappingsPatch.fileExists(project))
+        spigotMemberMappingsPatch.set(extension.paper.spigotMemberMappingsPatch.fileExists(project))
 
         mergedMappings.set(cache.resolve(MOJANG_YARN_SPIGOT_MAPPINGS))
         mojangToMergedMappings.set((cache.resolve(MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS)))
+    }
+
+    val patchMojangToMergedMappings by tasks.registering<PatchMappings> {
+        inputMappings.set(generateMergedMappings.flatMap { it.mojangToMergedMappings })
+        patch.set(extension.paper.mergedMappingsPatch.fileExists(project))
+
+        fromNamespace.set(DEOBF_NAMESPACE)
+        toNamespace.set(MERGED_NAMESPACE)
+
+        outputMappings.set(cache.resolve(PATCHED_MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS))
+    }
+
+    val remapJarMerged by tasks.registering<RemapJar> {
+        inputJar.set(applyMergedAt.flatMap { it.outputJar })
+        mappingsFile.set(patchMojangToMergedMappings.flatMap { it.outputMappings })
+        fromNamespace.set(DEOBF_NAMESPACE)
+        toNamespace.set(MERGED_NAMESPACE)
+        remapper.from(project.configurations.named(REMAPPER_CONFIG))
+    }
+
+    val exportMergedVanillaJar by tasks.registering<CopyResources> {
+        inputJar.set(remapJarMerged.flatMap { it.outputJar })
+        vanillaJar.set(downloadServerJar.flatMap { it.outputJar })
+        includes.set(listOf("/data/**", "/assets/**", "version.json", "yggdrasil_session_pubkey.der", "pack.mcmeta"))
+
+        outputJar.set(cache.resolve(FINAL_REMAPPED_MERGED_JAR))
+    }
+
+    val decompileJarMerged by tasks.registering<RunForgeFlower> {
+        executable.from(project.configurations.named(DECOMPILER_CONFIG))
+
+        inputJar.set(exportMergedVanillaJar.flatMap { it.outputJar })
+        libraries.from(downloadMcLibraries.map { it.outputDir.asFileTree })
+
+        outputJar.set(cache.resolve(FINAL_DECOMPILE_MERGED_JAR))
+    }
+
+    val remapSourcesMerged by tasks.registering<RemapMojangSources> {
+        remapDir.set(applyServerPatches.flatMap { it.outputDir })
+        paperApiDir.set(applyApiPatches.flatMap { it.outputDir })
+        mappings.set(patchMojangToMergedMappings.flatMap { it.outputMappings })
+        vanillaJar.set(downloadServerJar.flatMap { it.outputJar })
+        mojangMappedVanillaJar.set(fixJar.flatMap { it.outputJar })
+        spigotDeps.from(downloadSpigotDependencies.map { it.outputDir.asFileTree })
     }
 }
