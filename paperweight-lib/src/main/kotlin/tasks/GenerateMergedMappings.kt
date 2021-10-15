@@ -22,7 +22,6 @@
 
 package io.papermc.paperweight.tasks
 
-import com.github.salomonbrys.kotson.fromJson
 import dev.denwav.hypo.asm.AsmClassDataProvider
 import dev.denwav.hypo.asm.hydrate.BridgeMethodHydrator
 import dev.denwav.hypo.asm.hydrate.SuperConstructorHydrator
@@ -62,6 +61,10 @@ abstract class GenerateMergedMappings : BaseTask() {
     @get:Classpath
     abstract val vanillaJar: RegularFileProperty
 
+    @get:Optional // This is not actually optional but is needed to allow delayed initialization
+    @get:Classpath
+    abstract val paperMappedJar: RegularFileProperty
+
     @get:CompileClasspath
     abstract val libraries: ConfigurableFileCollection
 
@@ -79,6 +82,11 @@ abstract class GenerateMergedMappings : BaseTask() {
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val spigotMemberMappingsPatch: RegularFileProperty
 
+    @get:Optional
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val mergedMappingsPatch: RegularFileProperty
+
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val mojangYarnMappings: RegularFileProperty
@@ -95,6 +103,9 @@ abstract class GenerateMergedMappings : BaseTask() {
 
     @get:OutputFile
     abstract val mojangToMergedMappings: RegularFileProperty
+
+    @get:OutputFile
+    abstract val patchedMojangToMergedMappings: RegularFileProperty
 
     override fun init() {
         patchedSpigotMemberMappings.convention(defaultOutput("members.csrg"))
@@ -181,16 +192,47 @@ abstract class GenerateMergedMappings : BaseTask() {
         val mojangToMergedSet = mojangMappings.merge(targetMappings)
 
         MappingFormats.TINY.write(mojangToMergedSet, mojangToMergedMappings.path, DEOBF_NAMESPACE, MERGED_NAMESPACE)
+        applyTinyPatch(mojangToMergedMappings, patchedMojangToMergedMappings)
     }
 
     private fun addLines(file: Path, patchFile: Path?, outputFile: Path) {
         val lines = mutableListOf<String>()
         file.useLines { seq -> seq.forEach { line -> lines += line } }
         patchFile?.useLines { seq -> seq.forEach { lines.add(it) } }
-        //lines.sort()
         outputFile.bufferedWriter().use { writer ->
             lines.forEach { writer.appendLine(it) }
         }
+    }
+
+    private fun applyTinyPatch(input: RegularFileProperty, output: RegularFileProperty) {
+        val mappings = MappingFormats.TINY.read(
+            input.path,
+            DEOBF_NAMESPACE,
+            MERGED_NAMESPACE
+        )
+        mergedMappingsPatch.pathOrNull?.let { patchFile ->
+            val temp = createTempFile("patch", "tiny")
+            try {
+                val comment = commentRegex()
+                // tiny format doesn't allow comments, so we manually remove them
+                // The tiny mappings reader also doesn't have a InputStream or Reader input
+                patchFile.useLines { lines ->
+                    temp.bufferedWriter().use { writer ->
+                        for (line in lines) {
+                            val newLine = comment.replace(line, "")
+                            if (newLine.isNotBlank()) {
+                                writer.appendLine(newLine)
+                            }
+                        }
+                    }
+                }
+                MappingFormats.TINY.read(mappings, temp, DEOBF_NAMESPACE, MERGED_NAMESPACE)
+            } finally {
+                temp.deleteForcefully()
+            }
+        }
+
+        MappingFormats.TINY.write(mappings, output.path, DEOBF_NAMESPACE, MERGED_NAMESPACE)
     }
 
     private fun discardFieldMappings(mappings: MappingSet): MappingSet {

@@ -106,7 +106,7 @@ class PaperweightCore : Plugin<Project> {
             atFile.set(tasks.mergeAdditionalAts.flatMap { it.outputFile })
             mergedMappings.set(tasks.generateMergedMappings.flatMap { it.mergedMappings })
             mojangToMergedMappings.set(tasks.generateMergedMappings.flatMap { it.mojangToMergedMappings })
-            patchedMojangToMergedMappings.set(tasks.patchMojangToMergedMappings.flatMap { it.outputMappings })
+            patchedMojangToMergedMappings.set(tasks.generateMergedMappings.flatMap { it.patchedMojangToMergedMappings })
             remappedMergedSourcesJar.set(tasks.remapSourcesMerged.flatMap { it.sourcesOutputZip })
 
             dataFile.set(

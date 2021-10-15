@@ -170,24 +170,16 @@ open class AllTasks(
         mojangYarnMappings.set(generateMappings.flatMap { it.outputMappings })
         spigotClassMappingsPatch.set(extension.paper.spigotClassMappingsPatch.fileExists(project))
         spigotMemberMappingsPatch.set(extension.paper.spigotMemberMappingsPatch.fileExists(project))
+        mergedMappingsPatch.set(extension.paper.mergedMappingsPatch.fileExists(project))
 
         mergedMappings.set(cache.resolve(MOJANG_YARN_SPIGOT_MAPPINGS))
         mojangToMergedMappings.set((cache.resolve(MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS)))
-    }
-
-    val patchMojangToMergedMappings by tasks.registering<PatchMappings> {
-        inputMappings.set(generateMergedMappings.flatMap { it.mojangToMergedMappings })
-        patch.set(extension.paper.mergedMappingsPatch.fileExists(project))
-
-        fromNamespace.set(DEOBF_NAMESPACE)
-        toNamespace.set(MERGED_NAMESPACE)
-
-        outputMappings.set(cache.resolve(PATCHED_MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS))
+        patchedMojangToMergedMappings.set(cache.resolve(PATCHED_MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS))
     }
 
     val remapJarMerged by tasks.registering<RemapJar> {
         inputJar.set(applyMergedAt.flatMap { it.outputJar })
-        mappingsFile.set(patchMojangToMergedMappings.flatMap { it.outputMappings })
+        mappingsFile.set(generateMergedMappings.flatMap { it.patchedMojangToMergedMappings })
         fromNamespace.set(DEOBF_NAMESPACE)
         toNamespace.set(MERGED_NAMESPACE)
         remapper.from(project.configurations.named(REMAPPER_CONFIG))
@@ -213,7 +205,7 @@ open class AllTasks(
     val remapSourcesMerged by tasks.registering<RemapMojangSources> {
         remapDir.set(applyServerPatches.flatMap { it.outputDir })
         paperApiDir.set(applyApiPatches.flatMap { it.outputDir })
-        mappings.set(patchMojangToMergedMappings.flatMap { it.outputMappings })
+        mappings.set(generateMergedMappings.flatMap { it.patchedMojangToMergedMappings })
         vanillaJar.set(downloadServerJar.flatMap { it.outputJar })
         mojangMappedVanillaJar.set(fixJar.flatMap { it.outputJar })
         spigotDeps.from(downloadSpigotDependencies.map { it.outputDir.asFileTree })
