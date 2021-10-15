@@ -202,7 +202,7 @@ open class AllTasks(
         outputJar.set(cache.resolve(FINAL_DECOMPILE_MERGED_JAR))
     }
 
-    val remapSourcesMerged by tasks.registering<RemapMojangSources> {
+    val remapSourcesMerged by tasks.registering<RemapPaperSources> {
         remapDir.set(applyServerPatches.flatMap { it.outputDir })
         paperApiDir.set(applyApiPatches.flatMap { it.outputDir })
         mappings.set(generateMergedMappings.flatMap { it.patchedMojangToMergedMappings })

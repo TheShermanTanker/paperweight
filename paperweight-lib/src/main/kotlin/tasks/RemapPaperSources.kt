@@ -40,7 +40,7 @@ import org.gradle.workers.WorkParameters
 import org.gradle.workers.WorkerExecutor
 
 @CacheableTask
-abstract class RemapMojangSources : JavaLauncherTask() {
+abstract class RemapPaperSources : JavaLauncherTask() {
 
     @get:CompileClasspath
     abstract val vanillaJar: RegularFileProperty
@@ -76,7 +76,7 @@ abstract class RemapMojangSources : JavaLauncherTask() {
         super.init()
 
         jvmargs.convention(listOf("-Xmx2G"))
-        sourcesOutputZip.convention(defaultOutput("$name-sources", "jar"))
+        sourcesOutputZip.convention(defaultOutput("$name-sources", "zip"))
     }
 
     @TaskAction
@@ -98,10 +98,10 @@ abstract class RemapMojangSources : JavaLauncherTask() {
                 classpath.from(paperApiDir.dir("src/main/java").path)
                 classpath.from(spigotDeps.files.filter { it.toPath().isLibraryJar })
 
-                mappings.set(this@RemapMojangSources.mappings.path)
+                mappings.set(this@RemapPaperSources.mappings.path)
                 inputDir.set(srcDir)
 
-                cacheDir.set(this@RemapMojangSources.layout.cache)
+                cacheDir.set(this@RemapPaperSources.layout.cache)
 
                 outputDir.set(srcOut)
             }
