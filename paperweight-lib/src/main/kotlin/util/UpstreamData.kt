@@ -41,9 +41,6 @@ data class UpstreamData(
     val vanillaIncludes: List<String>,
     val paramMappings: MavenDep,
     val accessTransform: Path,
-    val mergedMappings: Path,
-    val mojangToMergedMappings: Path,
-    val patchedMojangToMergedMappings: Path,
     val remappedMergedSourcesJar: Path
 )
 

@@ -77,15 +77,6 @@ abstract class PaperweightCoreUpstreamData : DefaultTask() {
     abstract val sourceMappings: RegularFileProperty
 
     @get:InputFile
-    abstract val mergedMappings: RegularFileProperty
-
-    @get:InputFile
-    abstract val mojangToMergedMappings: RegularFileProperty
-
-    @get:InputFile
-    abstract val patchedMojangToMergedMappings: RegularFileProperty
-
-    @get:InputFile
     abstract val remappedMergedSourcesJar: RegularFileProperty
 
     @get:Input
@@ -127,9 +118,6 @@ abstract class PaperweightCoreUpstreamData : DefaultTask() {
             vanillaJarIncludes.get(),
             determineMavenDep(paramMappingsUrl, paramMappingsConfig),
             atFile.path,
-            mergedMappings.path,
-            mojangToMergedMappings.path,
-            patchedMojangToMergedMappings.path,
             remappedMergedSourcesJar.path
         )
         dataFilePath.bufferedWriter(Charsets.UTF_8).use { writer ->

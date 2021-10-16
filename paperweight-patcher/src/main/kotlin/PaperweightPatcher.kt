@@ -124,24 +124,6 @@ class PaperweightPatcher : Plugin<Project> {
                 }
             }
 
-            val mergedMappings: RegularFileProperty = objects.fileProperty()
-            val mojangToMergedMappings: RegularFileProperty = objects.fileProperty()
-            val patchedMojangToMergedMappings: RegularFileProperty = objects.fileProperty()
-            mergedMappings.set(target.layout.cache.resolve(MOJANG_YARN_SPIGOT_MAPPINGS))
-            mojangToMergedMappings.set(target.layout.cache.resolve(MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS))
-            patchedMojangToMergedMappings.set(target.layout.cache.resolve(PATCHED_MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS))
-
-            val upstreamMergedMappings: RegularFileProperty = objects.fileProperty()
-            val upstreamMojangToMergedMappings: RegularFileProperty = objects.fileProperty()
-            val upstreamPatchedMojangToMergedMappings: RegularFileProperty = objects.fileProperty()
-            upstreamMergedMappings.pathProvider(upstreamDataTask.mapUpstreamData { it.mergedMappings })
-            upstreamMojangToMergedMappings.pathProvider(upstreamDataTask.mapUpstreamData { it.mojangToMergedMappings })
-            upstreamPatchedMojangToMergedMappings.pathProvider(upstreamDataTask.mapUpstreamData { it.patchedMojangToMergedMappings })
-
-            upstreamMergedMappings.orNull?.asFile?.copyTo(target = mergedMappings.get().asFile, overwrite = true)
-            upstreamMojangToMergedMappings.orNull?.asFile?.copyTo(target = mojangToMergedMappings.get().asFile, overwrite = true)
-            upstreamPatchedMojangToMergedMappings.orNull?.asFile?.copyTo(target = patchedMojangToMergedMappings.get().asFile, overwrite = true)
-
             val upstreamData = upstreamDataTask.readUpstreamData()
             val serverProj = patcher.serverProject.forUseAtConfigurationTime().orNull ?: return@afterEvaluate
             serverProj.apply(plugin = "com.github.johnrengelman.shadow")

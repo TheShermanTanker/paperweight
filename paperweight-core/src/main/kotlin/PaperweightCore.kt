@@ -104,9 +104,6 @@ class PaperweightCore : Plugin<Project> {
             paramMappingsUrl.set(ext.paramMappingsRepo)
             paramMappingsConfig.set(target.configurations.named(PARAM_MAPPINGS_CONFIG))
             atFile.set(tasks.mergeAdditionalAts.flatMap { it.outputFile })
-            mergedMappings.set(tasks.generateMergedMappings.flatMap { it.mergedMappings })
-            mojangToMergedMappings.set(tasks.generateMergedMappings.flatMap { it.mojangToMergedMappings })
-            patchedMojangToMergedMappings.set(tasks.generateMergedMappings.flatMap { it.patchedMojangToMergedMappings })
             remappedMergedSourcesJar.set(tasks.remapSourcesMerged.flatMap { it.sourcesOutputZip })
 
             dataFile.set(
