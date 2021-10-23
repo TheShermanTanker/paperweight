@@ -41,7 +41,8 @@ data class UpstreamData(
     val vanillaIncludes: List<String>,
     val paramMappings: MavenDep,
     val accessTransform: Path,
-    val remappedMergedSourcesJar: Path
+    val remappedMergedSourcesZip: Path,
+    val remappedMergedTestsZip: Path
 )
 
 fun readUpstreamData(inputFile: RegularFile): UpstreamData? {

@@ -104,7 +104,8 @@ class PaperweightCore : Plugin<Project> {
             paramMappingsUrl.set(ext.paramMappingsRepo)
             paramMappingsConfig.set(target.configurations.named(PARAM_MAPPINGS_CONFIG))
             atFile.set(tasks.mergeAdditionalAts.flatMap { it.outputFile })
-            remappedMergedSourcesJar.set(tasks.remapSourcesMerged.flatMap { it.sourcesOutputZip })
+            remappedMergedSourcesZip.set(tasks.remapSourcesMerged.flatMap { it.sourcesOutputZip })
+            remappedMergedTestsZip.set(tasks.remapSourcesMerged.flatMap { it.testsOutputZip })
 
             dataFile.set(
                 target.layout.file(

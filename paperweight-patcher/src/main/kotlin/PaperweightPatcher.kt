@@ -116,7 +116,8 @@ class PaperweightPatcher : Plugin<Project> {
                 for (patchTask in upstream.patchTasks) {
                     patchTask.patchTask {
                         if(patchTask.serverDir.get()) {
-                            remappedSources.convention(target, upstreamDataTask.mapUpstreamData { it.remappedMergedSourcesJar })
+                            remappedSources.convention(target, upstreamDataTask.mapUpstreamData { it.remappedMergedSourcesZip })
+                            remappedTests.convention(target, upstreamDataTask.mapUpstreamData { it.remappedMergedTestsZip })
                         }
                         sourceMcDevJar.convention(target, upstreamDataTask.mapUpstreamData { it.decompiledJar })
                         mcLibrariesDir.convention(target, upstreamDataTask.mapUpstreamData { it.libSourceDir })

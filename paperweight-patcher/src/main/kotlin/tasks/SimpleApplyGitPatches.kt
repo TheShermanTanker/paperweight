@@ -22,6 +22,7 @@
 
 package io.papermc.paperweight.patcher.tasks
 
+import io.papermc.paperweight.PaperweightException
 import io.papermc.paperweight.tasks.*
 import io.papermc.paperweight.util.*
 import javax.inject.Inject
@@ -52,6 +53,10 @@ abstract class SimpleApplyGitPatches : ControllableOutputTask() {
     @get:Optional
     @get:InputFile
     abstract val remappedSources: DirectoryProperty
+
+    @get:Optional
+    @get:InputFile
+    abstract val remappedTests: RegularFileProperty
 
     @get:Input
     abstract val bareDirectory: Property<Boolean>
@@ -121,6 +126,7 @@ abstract class SimpleApplyGitPatches : ControllableOutputTask() {
         git("config", "commit.gpgsign", "false").executeSilently()
 
         val srcDir = output.resolve("src/main/java")
+        val testDir = output.resolve("src/test/java")
 
         if(remappedSources.pathOrNull != null) {
             srcDir.deleteRecursively()
@@ -128,6 +134,17 @@ abstract class SimpleApplyGitPatches : ControllableOutputTask() {
             fs.copy {
                 from(archives.zipTree(remappedSources.path))
                 into(srcDir)
+            }
+            // Tests have to be specified if the sources were remapped
+            if(remappedTests.pathOrNull != null) {
+                testDir.deleteRecursively()
+                testDir.createDirectories()
+                fs.copy {
+                    from(archives.zipTree(remappedTests.path))
+                    into(testDir)
+                }
+            } else {
+                throw PaperweightException("Unable to find Remapped Tests")
             }
         }
 

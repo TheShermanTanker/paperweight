@@ -66,6 +66,9 @@ abstract class RemapPaperSources : JavaLauncherTask() {
     @get:OutputFile
     abstract val sourcesOutputZip: RegularFileProperty
 
+    @get:OutputFile
+    abstract val testsOutputZip: RegularFileProperty
+
     @get:Internal
     abstract val jvmargs: ListProperty<String>
 
@@ -77,11 +80,13 @@ abstract class RemapPaperSources : JavaLauncherTask() {
 
         jvmargs.convention(listOf("-Xmx2G"))
         sourcesOutputZip.convention(defaultOutput("$name-sources", "zip"))
+        testsOutputZip.convention(defaultOutput("$name-tests", "zip"))
     }
 
     @TaskAction
     fun run() {
         val srcOut = findOutputDir(sourcesOutputZip.path).apply { createDirectories() }
+        val testOut = findOutputDir(testsOutputZip.path).apply { createDirectories() }
 
         try {
             val queue = workerExecutor.processIsolation {
@@ -91,8 +96,8 @@ abstract class RemapPaperSources : JavaLauncherTask() {
 
             val srcDir = remapDir.path.resolve("src/main/java")
 
-            // Remap sources
-            queue.submit(RemapAction::class) {
+            // Remap Sources
+            queue.submit(RemapPaperAction::class) {
                 classpath.from(mojangMappedVanillaJar.path)
                 classpath.from(vanillaJar.path)
                 classpath.from(paperApiDir.dir("src/main/java").path)
@@ -105,16 +110,35 @@ abstract class RemapPaperSources : JavaLauncherTask() {
 
                 outputDir.set(srcOut)
             }
+            
+            val testDir = remapDir.path.resolve("src/test/java")
+
+            // Remap Tests
+            queue.submit(RemapPaperAction::class) {
+                classpath.from(mojangMappedVanillaJar.path)
+                classpath.from(vanillaJar.path)
+                classpath.from(srcDir)
+                classpath.from(paperApiDir.dir("src/main/java").path)
+                classpath.from(spigotDeps.files.filter { it.toPath().isLibraryJar })
+
+                mappings.set(this@RemapPaperSources.mappings.path)
+                inputDir.set(testDir)
+
+                cacheDir.set(this@RemapPaperSources.layout.cache)
+
+                outputDir.set(testOut)
+            }
 
             queue.await()
 
             zip(srcOut, sourcesOutputZip)
+            zip(testOut, testsOutputZip)
         } finally {
             srcOut.deleteRecursively()
         }
     }
 
-    abstract class RemapAction : WorkAction<RemapMojangParams> {
+    abstract class RemapPaperAction : WorkAction<RemapMojangParams> {
         override fun execute() {
             val mappingSet = MappingFormats.TINY.read(
                 parameters.mappings.path,
