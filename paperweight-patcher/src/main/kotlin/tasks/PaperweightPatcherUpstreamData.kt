@@ -29,13 +29,19 @@ import kotlin.collections.set
 import kotlin.io.path.*
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.initialization.dsl.ScriptHandler
+import org.gradle.api.internal.BuildDefinition
+import org.gradle.api.internal.GradleInternal
 import org.gradle.api.internal.StartParameterInternal
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.UntrackedTask
+import org.gradle.internal.build.BuildState
+import org.gradle.internal.build.BuildStateRegistry
 import org.gradle.internal.build.NestedRootBuildRunner
+import org.gradle.internal.build.PublicBuildPath
 
 @UntrackedTask(because = "Nested build does it's own up-to-date checking")
 abstract class PaperweightPatcherUpstreamData : BaseTask() {
@@ -61,6 +67,41 @@ abstract class PaperweightPatcherUpstreamData : BaseTask() {
 
         params.projectProperties[UPSTREAM_WORK_DIR_PROPERTY] = workDir.path.absolutePathString()
         params.projectProperties[PAPERWEIGHT_DOWNSTREAM_FILE_PROPERTY] = upstreamDataFile.absolutePathString()
+
+        /**
+         * Injector start: Inline runNestedRootBuild and createNestedBuildTree to get more control
+         * over the upstream build
+         *
+         * This is largely achieved through exposing the BuildTreeLifecycleController object
+         */
+        val fromBuild = services.get(PublicBuildPath::class.java)
+        val buildDefinition = BuildDefinition.fromStartParameter(params as StartParameterInternal, fromBuild)
+
+        val currentBuild: BuildState = services.get(BuildState::class.java)
+
+        val buildStateRegistry = services.get(BuildStateRegistry::class.java)
+        val buildTree = buildStateRegistry.addNestedBuildTree(buildDefinition, currentBuild, null)
+
+        buildTree.run { buildController ->
+            buildController.gradle.settingsEvaluated {
+                pluginManagement {
+                    resolutionStrategy {
+                        eachPlugin {
+                            if(requested.id.id == "io.papermc.paperweight.core" || requested.id.id == "io.papermc.paperweight.patcher") {
+                                project.buildscript.configurations.getByName(ScriptHandler::CLASSPATH_CONFIGURATION.get()).resolvedConfiguration.firstLevelModuleDependencies.forEach {
+                                    if(it.moduleName.startsWith("io.papermc.paperweight.patcher")) {
+                                        useVersion(it.moduleVersion)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // This makes the assumption that paperweight-core with the same version is hosted in the same repository
+                    repositories.addAll((project.gradle as GradleInternal).settings.pluginManagement.repositories)
+                }
+            }
+            buildController.scheduleAndRunTasks()
+        }
 
         params.systemPropertiesArgs[PAPERWEIGHT_DEBUG] = System.getProperty(PAPERWEIGHT_DEBUG, "false")
 
