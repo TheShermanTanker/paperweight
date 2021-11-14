@@ -36,7 +36,9 @@ import io.papermc.paperweight.tasks.*
 import io.papermc.paperweight.util.*
 import io.papermc.paperweight.util.constants.*
 import java.io.File
+import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.io.path.*
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
@@ -69,6 +71,10 @@ class PaperweightPatcher : Plugin<Project> {
         val workDirProp = target.providers.gradleProperty(UPSTREAM_WORK_DIR_PROPERTY).forUseAtConfigurationTime()
         val dataFileProp = target.providers.gradleProperty(PAPERWEIGHT_DOWNSTREAM_FILE_PROPERTY).forUseAtConfigurationTime()
 
+        val downstreamSpigotClassMappingsPatch = target.providers.gradleProperty(PAPERWEIGHT_DOWNSTREAM_SPIGOT_CLASS_MAPPINGS_PATCH).forUseAtConfigurationTime().map { File(it) }.orNull.convertToPathOrNull()
+        val downstreamSpigotMemberMappingsPatch = target.providers.gradleProperty(PAPERWEIGHT_DOWNSTREAM_SPIGOT_MEMBER_MAPPINGS_PATCH).forUseAtConfigurationTime().map { File(it) }.orNull.convertToPathOrNull()
+        val downstreamMergedMappingsPatch = target.providers.gradleProperty(PAPERWEIGHT_DOWNSTREAM_MERGED_MAPPINGS_PATCH).forUseAtConfigurationTime().map { File(it) }.orNull.convertToPathOrNull()
+
         val applyPatches by target.tasks.registering { group = "paperweight" }
         val rebuildPatches by target.tasks.registering { group = "paperweight" }
         val generateReobfMappings by target.tasks.registering(GenerateReobfMappings::class)
@@ -97,8 +103,11 @@ class PaperweightPatcher : Plugin<Project> {
 
         val upstreamDataTaskRef = AtomicReference<TaskProvider<PaperweightPatcherUpstreamData>>(null)
 
+        val downstreamCache = createTempDirectory(target.layout.cache.parent, "downstreamMerge")
+        val (spigotClassMappingsPatch, spigotMemberMappingsPatch, mergedMappingsPatch) = mergeMappingsPatchesWithDownstream(downstreamCache, target, patcher, downstreamSpigotClassMappingsPatch, downstreamSpigotMemberMappingsPatch, downstreamMergedMappingsPatch)
+
         patcher.upstreams.all {
-            val taskPair = target.createUpstreamTask(this, patcher, workDirProp, upstreamDataTaskRef)
+            val taskPair = target.createUpstreamTask(this, patcher, workDirProp, upstreamDataTaskRef, spigotClassMappingsPatch, spigotMemberMappingsPatch, mergedMappingsPatch)
 
             patchTasks.all {
                 val createdPatchTask = target.createPatchTask(this, patcher, taskPair, applyPatches)
@@ -190,6 +199,8 @@ class PaperweightPatcher : Plugin<Project> {
                 patchReobfMappings.flatMap { it.outputMappings }
             ) ?: return@afterEvaluate
 
+            downstreamCache.deleteRecursively()
+
             val generatePaperclipPatch by target.tasks.registering<GeneratePaperclipPatch> {
                 originalJar.pathProvider(upstreamData.map { it.vanillaJar })
                 patchedJar.set(reobfJar.flatMap { it.outputJar })
@@ -204,7 +215,10 @@ class PaperweightPatcher : Plugin<Project> {
         upstream: PatcherUpstream,
         ext: PaperweightPatcherExtension,
         workDirProp: Provider<String>,
-        upstreamDataTaskRef: AtomicReference<TaskProvider<PaperweightPatcherUpstreamData>>
+        upstreamDataTaskRef: AtomicReference<TaskProvider<PaperweightPatcherUpstreamData>>,
+        finalSpigotClassMappingsPatch: Path?,
+        finalSpigotMemberMappingsPatch: Path?,
+        finalMergedMappingsPatch: Path?
     ): Pair<TaskProvider<CheckoutRepo>?, TaskProvider<PaperweightPatcherUpstreamData>> {
         val workDirFromProp = layout.dir(workDirProp.map { File(it) }).orElse(ext.upstreamsDir)
 
@@ -225,6 +239,9 @@ class PaperweightPatcher : Plugin<Project> {
             upstreamData {
                 dependsOn(cloneTask)
                 projectDir.convention(cloneTask.flatMap { it.outputDir })
+                spigotClassMappingsPatch.set(finalSpigotClassMappingsPatch)
+                spigotMemberMappingsPatch.set(finalSpigotMemberMappingsPatch)
+                mergedMappingsPatch.set(finalMergedMappingsPatch)
             }
 
             return@let cloneTask
@@ -296,5 +313,47 @@ class PaperweightPatcher : Plugin<Project> {
         }
 
         return rebuildTask
+    }
+}
+
+data class MergedDownstreamMappings(
+    val spigotClassMappingsPatch: Path?,
+    val spigotMemberMappingsPatch: Path?,
+    val mergedMappingsPatch: Path?
+)
+
+private fun mergeMappingsPatchesWithDownstream(
+    directory: Path,
+    project: Project,
+    extension: PaperweightPatcherExtension,
+    downstreamSpigotClassMappingsPatch: Path?,
+    downstreamSpigotMemberMappingsPatch: Path?,
+    downstreamMergedMappingsPatch: Path?
+): MergedDownstreamMappings {
+    val finalSpigotClassMappingsPatch = project.objects.fileProperty()
+    val finalSpigotMemberMappingsPatch = project.objects.fileProperty()
+    val finalMergedMappingsPatch = project.objects.fileProperty()
+    finalSpigotClassMappingsPatch.set(directory.resolve("mergedSpigotClassMappings.csrg"))
+    finalSpigotMemberMappingsPatch.set(directory.resolve("mergedSpigotMemberMappings.csrg"))
+    finalMergedMappingsPatch.set(directory.resolve("mergedDownstreamMappings.csrg"))
+    extension.additionalSpigotClassMappingsPatch.fileExists(project).pathOrNull?.copyTo(target = finalSpigotClassMappingsPatch.path, overwrite = true)
+    extension.additionalSpigotMemberMappingsPatch.fileExists(project).pathOrNull?.copyTo(target = finalSpigotMemberMappingsPatch.path, overwrite = true)
+    extension.mergedMappingsPatch.fileExists(project).pathOrNull?.copyTo(target = finalMergedMappingsPatch.path, overwrite = true)
+    mergePatches(finalSpigotClassMappingsPatch.path, downstreamSpigotClassMappingsPatch)
+    mergePatches(finalSpigotMemberMappingsPatch.path, downstreamSpigotMemberMappingsPatch)
+    mergePatches(finalMergedMappingsPatch.path, downstreamMergedMappingsPatch)
+    return MergedDownstreamMappings(finalSpigotClassMappingsPatch.fileExists(project).pathOrNull, finalSpigotMemberMappingsPatch.fileExists(project).pathOrNull, finalMergedMappingsPatch.fileExists(project).pathOrNull)
+}
+
+private fun mergePatches(file: Path, patch: Path?) {
+    if(file.exists()) {
+        val lines = mutableListOf<String>()
+        file.useLines { sequence -> sequence.forEach { line -> lines += line } }
+        patch?.useLines { sequence -> sequence.forEach { lines.add(it) } }
+        file.bufferedWriter().use { writer ->
+            lines.forEach { writer.appendLine(it) }
+        }
+    } else {
+        patch?.copyTo(file, true)
     }
 }

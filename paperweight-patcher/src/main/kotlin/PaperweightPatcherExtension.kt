@@ -22,12 +22,7 @@
 
 package io.papermc.paperweight.patcher
 
-import io.papermc.paperweight.patcher.upstream.DefaultPaperRepoPatcherUpstream
-import io.papermc.paperweight.patcher.upstream.DefaultPatcherUpstream
-import io.papermc.paperweight.patcher.upstream.DefaultRepoPatcherUpstream
-import io.papermc.paperweight.patcher.upstream.PaperRepoPatcherUpstream
-import io.papermc.paperweight.patcher.upstream.PatcherUpstream
-import io.papermc.paperweight.patcher.upstream.RepoPatcherUpstream
+import io.papermc.paperweight.patcher.upstream.*
 import io.papermc.paperweight.util.*
 import io.papermc.paperweight.util.constants.*
 import org.gradle.api.Action
@@ -55,6 +50,10 @@ open class PaperweightPatcherExtension(private val objects: ObjectFactory, layou
     val devImports: RegularFileProperty = objects.fileFrom(buildDataDir, "dev-imports.txt")
     val reobfMappingsPatch: RegularFileProperty = objects.fileFrom(buildDataDir, "reobf-mappings-patch.tiny")
     val reobfPackagesToFix: ListProperty<String> = objects.listProperty()
+
+    val additionalSpigotClassMappingsPatch: RegularFileProperty = objects.fileProperty().convention(buildDataDir.file("spigot-class-mappings-patch.csrg"))
+    val additionalSpigotMemberMappingsPatch: RegularFileProperty = objects.fileProperty().convention(buildDataDir.file("spigot-member-mappings-patch.csrg"))
+    val mergedMappingsPatch: RegularFileProperty = objects.fileProperty().convention(buildDataDir.file("merged-mappings-patch.csrg"))
 
     val decompileRepo: Property<String> = objects.property()
     val remapRepo: Property<String> = objects.property()

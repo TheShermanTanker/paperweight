@@ -87,10 +87,10 @@ class PaperweightCore : Plugin<Project> {
         target.createPatchRemapTask(tasks)
 
         target.tasks.register<PaperweightCorePrepareForDownstream>(PAPERWEIGHT_PREPARE_DOWNSTREAM) {
-            dependsOn(tasks.applyPatches)
+            dependsOn(tasks.applyPatches, tasks.remapForDownstream)
             vanillaJar.set(tasks.downloadServerJar.flatMap { it.outputJar })
-            remappedJar.set(tasks.copyResources.flatMap { it.outputJar })
-            decompiledJar.set(tasks.decompileJar.flatMap { it.outputJar })
+            remappedJar.set(tasks.exportMergedVanillaJar.flatMap { it.outputJar })
+            decompiledJar.set(tasks.decompileJarMerged.flatMap { it.outputJar })
             mcVersion.set(target.ext.minecraftVersion)
             mcLibrariesFile.set(tasks.inspectVanillaJar.flatMap { it.serverLibraries })
             mcLibrariesDir.set(tasks.downloadMcLibraries.flatMap { it.outputDir })

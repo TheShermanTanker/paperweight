@@ -27,6 +27,7 @@ import io.papermc.paperweight.core.extension.PaperweightCoreExtension
 import io.papermc.paperweight.tasks.*
 import io.papermc.paperweight.util.*
 import io.papermc.paperweight.util.constants.*
+import java.io.File
 import java.nio.file.Path
 import org.gradle.api.Project
 import org.gradle.api.Task
@@ -38,7 +39,7 @@ open class AllTasks(
     project: Project,
     tasks: TaskContainer = project.tasks,
     cache: Path = project.layout.cache,
-    extension: PaperweightCoreExtension = project.ext,
+    extension: PaperweightCoreExtension = project.ext
 ) : SpigotTasks(project) {
 
     val mergeAdditionalAts by tasks.registering<MergeAccessTransforms> {
@@ -158,5 +159,60 @@ open class AllTasks(
         toNamespace.set(SPIGOT_NAMESPACE)
 
         outputMappings.set(cache.resolve(PATCHED_REOBF_MOJANG_SPIGOT_MAPPINGS))
+    }
+
+    val cloneBuildData by tasks.registering<CloneBuildData>()
+
+    val generateMergedMappings by tasks.registering<GenerateMergedMappings> {
+        vanillaJar.set(filterVanillaJar.flatMap { it.outputJar })
+        mojangMappedJar.set(fixJar.flatMap { it.outputJar })
+        libraries.from(downloadMcLibraries.map { it.outputDir.asFileTree })
+        syntheticMethods.set(inspectVanillaJar.flatMap { it.syntheticMethods })
+
+        buildDataDir.set(cloneBuildData.flatMap { it.buildDataDir })
+        mojangYarnMappings.set(generateMappings.flatMap { it.outputMappings })
+        spigotClassMappingsPatch.set(project.providers.gradleProperty(PAPERWEIGHT_DOWNSTREAM_SPIGOT_CLASS_MAPPINGS_PATCH).map { File(it) }.orNull.convertToPathOrNull())
+        spigotMemberMappingsPatch.set(project.providers.gradleProperty(PAPERWEIGHT_DOWNSTREAM_SPIGOT_MEMBER_MAPPINGS_PATCH).map { File(it) }.orNull.convertToPathOrNull())
+        mergedMappingsPatch.set(project.providers.gradleProperty(PAPERWEIGHT_DOWNSTREAM_MERGED_MAPPINGS_PATCH).map { File(it) }.orNull.convertToPathOrNull())
+
+        mergedMappings.set(cache.resolve(MOJANG_YARN_SPIGOT_MAPPINGS))
+        mojangToMergedMappings.set((cache.resolve(MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS)))
+        patchedMojangToMergedMappings.set(cache.resolve(PATCHED_MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS))
+        patchedMojangToMergedSourceMappings.set(cache.resolve(PATCHED_MOJANG_YARN_MOJANG_YARN_SPIGOT_SOURCE_MAPPINGS))
+        generatedMojangToMergedPatch.set(cache.resolve(GENERATED_MERGED_MAPPINGS_PATCH))
+    }
+
+    val remapForDownstream by tasks.registering<RemapForDownstream> {
+        serverDir.set(applyServerPatches.flatMap { it.outputDir })
+        apiDir.set(applyApiPatches.flatMap { it.outputDir })
+        mappings.set(generateMergedMappings.flatMap { it.patchedMojangToMergedSourceMappings })
+        vanillaJar.set(downloadServerJar.flatMap { it.outputJar })
+        mojangMappedVanillaJar.set(fixJar.flatMap { it.outputJar })
+        spigotDeps.from(downloadSpigotDependencies.map { it.outputDir.asFileTree })
+    }
+
+    val remapJarMerged by tasks.registering<RemapJar> {
+        inputJar.set(applyMergedAt.flatMap { it.outputJar })
+        mappingsFile.set(generateMergedMappings.flatMap { it.patchedMojangToMergedMappings })
+        fromNamespace.set(DEOBF_NAMESPACE)
+        toNamespace.set(MERGED_NAMESPACE)
+        remapper.from(project.configurations.named(REMAPPER_CONFIG))
+    }
+
+    val exportMergedVanillaJar by tasks.registering<CopyResources> {
+        inputJar.set(remapJarMerged.flatMap { it.outputJar })
+        vanillaJar.set(downloadServerJar.flatMap { it.outputJar })
+        includes.set(listOf("/data/**", "/assets/**", "version.json", "yggdrasil_session_pubkey.der", "pack.mcmeta"))
+
+        outputJar.set(cache.resolve(FINAL_REMAPPED_MERGED_JAR))
+    }
+
+    val decompileJarMerged by tasks.registering<RunForgeFlower> {
+        executable.from(project.configurations.named(DECOMPILER_CONFIG))
+
+        inputJar.set(exportMergedVanillaJar.flatMap { it.outputJar })
+        libraries.from(downloadMcLibraries.map { it.outputDir.asFileTree })
+
+        outputJar.set(cache.resolve(FINAL_DECOMPILE_MERGED_JAR))
     }
 }

@@ -34,7 +34,9 @@ import org.gradle.api.internal.BuildDefinition
 import org.gradle.api.internal.GradleInternal
 import org.gradle.api.internal.StartParameterInternal
 import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.UntrackedTask
@@ -45,6 +47,18 @@ import org.gradle.internal.build.PublicBuildPath
 
 @UntrackedTask(because = "Nested build does it's own up-to-date checking")
 abstract class PaperweightPatcherUpstreamData : BaseTask() {
+
+    @get:Optional
+    @get:InputFile
+    abstract val spigotClassMappingsPatch: RegularFileProperty
+
+    @get:Optional
+    @get:InputFile
+    abstract val spigotMemberMappingsPatch: RegularFileProperty
+
+    @get:Optional
+    @get:InputFile
+    abstract val mergedMappingsPatch: RegularFileProperty
 
     @get:InputDirectory
     abstract val projectDir: DirectoryProperty
@@ -67,39 +81,44 @@ abstract class PaperweightPatcherUpstreamData : BaseTask() {
 
         params.projectProperties[UPSTREAM_WORK_DIR_PROPERTY] = workDir.path.absolutePathString()
         params.projectProperties[PAPERWEIGHT_DOWNSTREAM_FILE_PROPERTY] = upstreamDataFile.absolutePathString()
+        params.projectProperties[PAPERWEIGHT_DOWNSTREAM_SPIGOT_CLASS_MAPPINGS_PATCH] = spigotClassMappingsPatch.pathOrNull?.absolutePathString()
+        params.projectProperties[PAPERWEIGHT_DOWNSTREAM_SPIGOT_MEMBER_MAPPINGS_PATCH] = spigotMemberMappingsPatch.pathOrNull?.absolutePathString()
+        params.projectProperties[PAPERWEIGHT_DOWNSTREAM_MERGED_MAPPINGS_PATCH] = mergedMappingsPatch.pathOrNull?.absolutePathString()
 
         /**
          * Injector start: Inline runNestedRootBuild and createNestedBuildTree to get more control
          * over the upstream build
          *
-         * This is largely achieved through exposing the BuildTreeLifecycleController object
+         * This is largely achieved through exposing the BuildState object
          */
+
         val fromBuild = services.get(PublicBuildPath::class.java)
         val buildDefinition = BuildDefinition.fromStartParameter(params as StartParameterInternal, fromBuild)
 
         val currentBuild: BuildState = services.get(BuildState::class.java)
 
-        val buildStateRegistry = services.get(BuildStateRegistry::class.java)
-        val buildTree = buildStateRegistry.addNestedBuildTree(buildDefinition, currentBuild, null)
-
-        buildTree.run { buildController ->
-            buildController.gradle.settingsEvaluated {
-                pluginManagement {
-                    resolutionStrategy {
-                        eachPlugin {
-                            if(requested.id.id == "io.papermc.paperweight.core" || requested.id.id == "io.papermc.paperweight.patcher") {
-                                project.buildscript.configurations.getByName(ScriptHandler::CLASSPATH_CONFIGURATION.get()).resolvedConfiguration.firstLevelModuleDependencies.forEach {
-                                    if(it.moduleName.startsWith("io.papermc.paperweight.patcher")) {
-                                        useVersion(it.moduleVersion)
-                                    }
+        currentBuild.build.settingsEvaluated {
+            pluginManagement {
+                resolutionStrategy {
+                    eachPlugin {
+                        if(requested.id.id == "io.papermc.paperweight.core" || requested.id.id == "io.papermc.paperweight.patcher") {
+                            project.buildscript.configurations.getByName(ScriptHandler::CLASSPATH_CONFIGURATION.get()).resolvedConfiguration.firstLevelModuleDependencies.forEach {
+                                if(it.moduleName.startsWith("io.papermc.paperweight.patcher")) {
+                                    useVersion(it.moduleVersion)
                                 }
                             }
                         }
                     }
-                    // This makes the assumption that paperweight-core with the same version is hosted in the same repository
-                    repositories.addAll((project.gradle as GradleInternal).settings.pluginManagement.repositories)
                 }
+                // This makes the assumption that paperweight-core with the same version is hosted in the same repository
+                repositories.addAll((project.gradle as GradleInternal).settings.pluginManagement.repositories)
             }
+        }
+
+        val buildStateRegistry = services.get(BuildStateRegistry::class.java)
+        val buildTree = buildStateRegistry.addNestedBuildTree(buildDefinition, currentBuild, null)
+
+        buildTree.run { buildController ->
             buildController.scheduleAndRunTasks()
         }
 

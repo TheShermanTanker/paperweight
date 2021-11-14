@@ -52,6 +52,9 @@ const val UPSTREAMS = "$PAPER_PATH/upstreams"
 const val UPSTREAM_WORK_DIR_PROPERTY = "paperweightUpstreamWorkDir"
 const val PAPERWEIGHT_PREPARE_DOWNSTREAM = "prepareForDownstream"
 const val PAPERWEIGHT_DOWNSTREAM_FILE_PROPERTY = "paperweightDownstreamDataFile"
+const val PAPERWEIGHT_DOWNSTREAM_SPIGOT_CLASS_MAPPINGS_PATCH = "paperweightDownstreamSpigotClassMappingsPatch"
+const val PAPERWEIGHT_DOWNSTREAM_SPIGOT_MEMBER_MAPPINGS_PATCH = "paperweightDownstreamSpigotMemberMappingsPatch"
+const val PAPERWEIGHT_DOWNSTREAM_MERGED_MAPPINGS_PATCH = "paperweightDownstreamMergedMappingsPatch"
 
 private const val JARS_PATH = "$PAPER_PATH/jars"
 const val MINECRAFT_JARS_PATH = "$JARS_PATH/minecraft"
@@ -72,9 +75,16 @@ const val PATCHED_SPIGOT_MOJANG_YARN_SOURCE_MAPPINGS = "$MAPPINGS_DIR/spigot-moj
 const val REOBF_MOJANG_SPIGOT_MAPPINGS = "$MAPPINGS_DIR/mojang+yarn-spigot-reobf.tiny"
 const val PATCHED_REOBF_MOJANG_SPIGOT_MAPPINGS = "$MAPPINGS_DIR/mojang+yarn-spigot-reobf-patched.tiny"
 
+const val MOJANG_YARN_SPIGOT_MAPPINGS = "$MAPPINGS_DIR/official-mojang+yarn+spigot.tiny"
+const val MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS = "$MAPPINGS_DIR/mojang+yarn-mojang+yarn+spigot.tiny"
+const val PATCHED_MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS = "$MAPPINGS_DIR/mojang+yarn-mojang+yarn+spigot-patched.tiny"
+const val PATCHED_MOJANG_YARN_MOJANG_YARN_SPIGOT_SOURCE_MAPPINGS = "$MAPPINGS_DIR/mojang+yarn-mojang+yarn+spigot-source-patched.tiny"
+const val GENERATED_MERGED_MAPPINGS_PATCH = "$MAPPINGS_DIR/merged-mappings-patch-generated.csrg"
+
 const val OBF_NAMESPACE = "official"
 const val SPIGOT_NAMESPACE = "spigot"
 const val DEOBF_NAMESPACE = "mojang+yarn"
+const val MERGED_NAMESPACE = "mojang+yarn+spigot"
 
 private const val DATA_PATH = "$PAPER_PATH/data"
 const val MC_MANIFEST = "$DATA_PATH/McManifest.json"
@@ -86,7 +96,9 @@ private const val SETUP_CACHE = "$PAPER_PATH/setupCache"
 private const val TASK_CACHE = "$PAPER_PATH/taskCache"
 
 const val FINAL_REMAPPED_JAR = "$TASK_CACHE/minecraft.jar"
+const val FINAL_REMAPPED_MERGED_JAR = "$TASK_CACHE/minecraft-merged.jar"
 const val FINAL_DECOMPILE_JAR = "$TASK_CACHE/decompileJar.jar"
+const val FINAL_DECOMPILE_MERGED_JAR = "$TASK_CACHE/minecraft-decompiled.jar"
 
 const val MC_DEV_SOURCES_DIR = "$PAPER_PATH/mc-dev-sources"
 
