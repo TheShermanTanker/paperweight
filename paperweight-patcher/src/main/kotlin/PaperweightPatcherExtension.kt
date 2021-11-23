@@ -56,6 +56,10 @@ open class PaperweightPatcherExtension(private val objects: ObjectFactory, layou
     val reobfMappingsPatch: RegularFileProperty = objects.fileFrom(buildDataDir, "reobf-mappings-patch.tiny")
     val reobfPackagesToFix: ListProperty<String> = objects.listProperty()
 
+    val spigotClassMappingsPatch: RegularFileProperty = objects.fileProperty()
+    val spigotMemberMappingsPatch: RegularFileProperty = objects.fileProperty()
+    val mergedMappingsPatch: RegularFileProperty = objects.fileProperty()
+
     val decompileRepo: Property<String> = objects.property()
     val remapRepo: Property<String> = objects.property()
 

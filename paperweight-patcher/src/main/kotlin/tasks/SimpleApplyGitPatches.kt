@@ -26,18 +26,25 @@ import io.papermc.paperweight.tasks.*
 import io.papermc.paperweight.util.*
 import javax.inject.Inject
 import kotlin.io.path.*
+import org.gradle.api.Project
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.Provider
 import org.gradle.api.provider.ProviderFactory
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
+import org.gradle.jvm.toolchain.JavaLauncher
+import org.gradle.kotlin.dsl.*
+import org.gradle.workers.WorkerExecutor
 
-abstract class SimpleApplyGitPatches : ControllableOutputTask() {
+abstract class SimpleApplyGitPatches : ControllableOutputTask(), JavaLauncherTaskBase {
 
     @get:InputDirectory
     abstract val upstreamDir: DirectoryProperty
@@ -54,6 +61,18 @@ abstract class SimpleApplyGitPatches : ControllableOutputTask() {
 
     @get:Input
     abstract val importMcDev: Property<Boolean>
+
+    @get:Optional
+    @get:InputFile
+    abstract val vanillaJar: RegularFileProperty
+
+    @get:Optional
+    @get:InputDirectory
+    abstract val apiSourceDir: DirectoryProperty
+
+    @get:Optional
+    @get:InputDirectory
+    abstract val remapSourceDir: DirectoryProperty
 
     @get:Optional
     @get:InputFile
@@ -79,7 +98,15 @@ abstract class SimpleApplyGitPatches : ControllableOutputTask() {
     @get:OutputDirectory
     abstract val mcDevSources: DirectoryProperty
 
+    @get:Internal
+    abstract val jvmargs: ListProperty<String>
+
+    @get:Inject
+    abstract val workerExecutor: WorkerExecutor
+
     override fun init() {
+        launcher.convention(defaultJavaLauncher(project))
+        jvmargs.convention(listOf("-Xmx2G"))
         upstreamBranch.convention("master")
         importMcDev.convention(false)
         printOutput.convention(true).finalizeValueOnRead()
@@ -118,6 +145,23 @@ abstract class SimpleApplyGitPatches : ControllableOutputTask() {
 
         val srcDir = output.resolve("src/main/java")
 
+        if(remapSourceDir.pathOrNull != null) {
+            val queue = workerExecutor.processIsolation {
+                forkOptions.jvmArgs(jvmargs.get())
+                forkOptions.executable(launcher.get().executablePath.path.absolutePathString())
+            }
+
+            queue.submit(RemapUpstreamAction::class) {
+
+            }
+
+            queue.submit(RemapUpstreamAction::class) {
+
+            }
+
+            queue.await()
+        }
+
         val patches = patchDir.pathOrNull?.listDirectoryEntries("*.patch") ?: listOf()
 
         if (sourceMcDevJar.isPresent && importMcDev.get()) {
@@ -141,3 +185,6 @@ abstract class SimpleApplyGitPatches : ControllableOutputTask() {
         makeMcDevSrc(sourceMcDevJar.path, srcDir, mcDevSources.path)
     }
 }
+
+private fun SimpleApplyGitPatches.defaultJavaLauncher(project: Project): Provider<JavaLauncher> =
+    javaToolchainService.defaultJavaLauncher(project)

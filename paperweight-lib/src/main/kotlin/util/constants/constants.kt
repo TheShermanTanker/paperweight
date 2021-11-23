@@ -72,9 +72,17 @@ const val PATCHED_SPIGOT_MOJANG_YARN_SOURCE_MAPPINGS = "$MAPPINGS_DIR/spigot-moj
 const val REOBF_MOJANG_SPIGOT_MAPPINGS = "$MAPPINGS_DIR/mojang+yarn-spigot-reobf.tiny"
 const val PATCHED_REOBF_MOJANG_SPIGOT_MAPPINGS = "$MAPPINGS_DIR/mojang+yarn-spigot-reobf-patched.tiny"
 
+const val MOJANG_YARN_SPIGOT_MAPPINGS = "$MAPPINGS_DIR/official-mojang+yarn+spigot.tiny"
+const val MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS = "$MAPPINGS_DIR/mojang+yarn-mojang+yarn+spigot.tiny"
+const val PATCHED_MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS = "$MAPPINGS_DIR/mojang+yarn-mojang+yarn+spigot-patched.tiny"
+const val PATCHED_MOJANG_YARN_MOJANG_YARN_SPIGOT_SOURCE_MAPPINGS = "$MAPPINGS_DIR/mojang+yarn-mojang+yarn+spigot-source-patched.tiny"
+const val GENERATED_MERGED_MAPPINGS_PATCH = "$MAPPINGS_DIR/merged-mappings-patch-generated.csrg"
+const val CLEANED_MERGED_MAPPINGS_PATCH = "$MAPPINGS_DIR/merged-mappings-patch-cleaned.tiny"
+
 const val OBF_NAMESPACE = "official"
 const val SPIGOT_NAMESPACE = "spigot"
 const val DEOBF_NAMESPACE = "mojang+yarn"
+const val MERGED_NAMESPACE = "mojang+yarn+spigot"
 
 private const val DATA_PATH = "$PAPER_PATH/data"
 const val MC_MANIFEST = "$DATA_PATH/McManifest.json"

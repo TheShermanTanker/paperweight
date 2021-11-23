@@ -34,6 +34,9 @@ interface PatchTaskConfig : Named {
     val upstreamDirPath: Property<String>
     val upstreamDir: DirectoryProperty
 
+    val apiSourceDirPath: Property<String>
+    val serverSourceDirPath: Property<String>
+
     val patchDir: DirectoryProperty
     val outputDir: DirectoryProperty
 

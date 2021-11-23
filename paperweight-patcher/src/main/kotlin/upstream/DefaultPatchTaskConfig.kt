@@ -41,6 +41,8 @@ open class DefaultPatchTaskConfig @Inject constructor(
 
     override val upstreamDirPath: Property<String> = objects.property()
     override val upstreamDir: DirectoryProperty = objects.directoryProperty()
+    override val apiSourceDirPath: Property<String> = objects.property()
+    override val serverSourceDirPath: Property<String> = objects.property()
     override val patchDir: DirectoryProperty = objects.directoryProperty()
     override val outputDir: DirectoryProperty = objects.directoryProperty()
     override val isBareDirectory: Property<Boolean> = objects.property<Boolean>().convention(false)

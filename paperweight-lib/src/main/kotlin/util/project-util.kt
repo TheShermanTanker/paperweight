@@ -143,3 +143,46 @@ private fun Project.addMcDevSourcesRoot(mcDevSourceDir: Path) {
         }
     }
 }
+
+fun Project.setupPatcherProject(
+    parent: Project,
+    remappedJar: Any,
+    remappedJarSources: Any,
+    mcDevSourceDir: Path,
+    libsFile: Any
+): Boolean {
+    if (!projectDir.exists()) {
+        return false
+    }
+
+    plugins.apply("java")
+
+    extensions.create<RelocationExtension>(RELOCATION_EXTENSION, objects)
+
+    configurations.named(JavaPlugin.IMPLEMENTATION_CONFIGURATION_NAME) {
+        withDependencies {
+            dependencies {
+                // update mc-dev sources on dependency resolution
+                makeMcDevSrc(
+                    remappedJarSources.convertToPath(),
+                    layout.projectDirectory.path.resolve("src/main/java"),
+                    mcDevSourceDir
+                )
+
+                add(create(parent.files(remappedJar)))
+
+                val libs = libsFile.convertToPathOrNull()
+                if (libs != null && libs.exists()) {
+                    libs.forEachLine { line ->
+                        add(create(line))
+                    }
+                }
+            }
+        }
+    }
+
+    addMcDevSourcesRoot(mcDevSourceDir)
+
+    plugins.apply("com.github.johnrengelman.shadow")
+    return true
+}

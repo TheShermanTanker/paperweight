@@ -24,6 +24,7 @@ package io.papermc.paperweight.patcher
 
 import io.papermc.paperweight.DownloadService
 import io.papermc.paperweight.patcher.tasks.CheckoutRepo
+import io.papermc.paperweight.patcher.tasks.DownloadSpigotMappings
 import io.papermc.paperweight.patcher.tasks.PaperweightPatcherPrepareForDownstream
 import io.papermc.paperweight.patcher.tasks.PaperweightPatcherUpstreamData
 import io.papermc.paperweight.patcher.tasks.SimpleApplyGitPatches
@@ -37,9 +38,11 @@ import io.papermc.paperweight.util.*
 import io.papermc.paperweight.util.constants.*
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.io.path.*
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
+import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.TaskProvider
@@ -72,6 +75,49 @@ class PaperweightPatcher : Plugin<Project> {
         val applyPatches by target.tasks.registering { group = "paperweight" }
         val rebuildPatches by target.tasks.registering { group = "paperweight" }
         val generateReobfMappings by target.tasks.registering(GenerateReobfMappings::class)
+
+        val downloadSpigotMappings by target.tasks.registering<DownloadSpigotMappings>()
+        val generateMergedMappings by target.tasks.registering<GenerateMergedMappings> {
+            spigotMappingsDir.set(downloadSpigotMappings.flatMap { it.mappingsDir })
+            spigotClassMappingsPatch.set(patcher.spigotClassMappingsPatch.pathOrNull)
+            spigotMemberMappingsPatch.set(patcher.spigotMemberMappingsPatch.pathOrNull)
+            mergedMappingsPatch.set(patcher.mergedMappingsPatch.pathOrNull)
+
+            mergedMappings.set(layout.cache.resolve(MOJANG_YARN_SPIGOT_MAPPINGS))
+            mojangToMergedMappings.set((layout.cache.resolve(MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS)))
+            patchedMojangToMergedMappings.set(layout.cache.resolve(PATCHED_MOJANG_YARN_MOJANG_YARN_SPIGOT_MAPPINGS))
+            patchedMojangToMergedSourceMappings.set(layout.cache.resolve(PATCHED_MOJANG_YARN_MOJANG_YARN_SPIGOT_SOURCE_MAPPINGS))
+            generatedMojangToMergedPatch.set(layout.cache.resolve(GENERATED_MERGED_MAPPINGS_PATCH))
+            cleanedPatch.set(layout.cache.resolve(CLEANED_MERGED_MAPPINGS_PATCH))
+        }
+
+        val filterVanillaJar by target.tasks.registering(FilterJar::class)
+        val filterMojangMappedJar by target.tasks.registering(FilterJar::class)
+
+        val inspectVanillaJar by target.tasks.registering<InspectVanillaJar> {
+            serverLibraries.set(layout.cache.resolve(SERVER_LIBRARIES))
+        }
+
+        val remapJar by target.tasks.registering<RemapJar> {
+            mappingsFile.set(generateMergedMappings.flatMap { it.patchedMojangToMergedMappings })
+            fromNamespace.set(DEOBF_NAMESPACE)
+            toNamespace.set(MERGED_NAMESPACE)
+            remapper.from(project.configurations.named(REMAPPER_CONFIG))
+        }
+
+        val copyResources by target.tasks.registering<CopyResources> {
+            inputJar.set(remapJar.flatMap { it.outputJar })
+            includes.set(listOf("/data/**", "/assets/**", "version.json", "yggdrasil_session_pubkey.der", "pack.mcmeta"))
+
+            outputJar.set(layout.cache.resolve(FINAL_REMAPPED_JAR))
+        }
+
+        val decompileJar by target.tasks.registering<RunForgeFlower> {
+            executable.from(target.configurations.named(DECOMPILER_CONFIG))
+            inputJar.set(copyResources.flatMap { it.outputJar })
+
+            outputJar.set(layout.cache.resolve(FINAL_DECOMPILE_JAR))
+        }
 
         val mergeReobfMappingsPatches by target.tasks.registering<PatchMappings> {
             patch.set(patcher.reobfMappingsPatch.fileExists(target))
@@ -131,6 +177,46 @@ class PaperweightPatcher : Plugin<Project> {
             val upstreamDataTask = upstreamDataTaskRef.get() ?: return@afterEvaluate
             val upstreamData = upstreamDataTask.map { readUpstreamData(it.dataFile) }
 
+            val mcVersion: Property<String> = target.objects.property()
+            mcVersion.set(upstreamData.map { it.mcVersion })
+
+            filterVanillaJar {
+                inputJar.pathProvider(upstreamData.map { it.vanillaJar })
+                includes.set(upstreamData.map { it.vanillaIncludes })
+            }
+
+            filterMojangMappedJar {
+                inputJar.pathProvider(upstreamData.map { it.remappedJar })
+                includes.set(upstreamData.map { it.vanillaIncludes })
+            }
+
+            inspectVanillaJar {
+                inputJar.pathProvider(upstreamData.map { it.vanillaJar })
+                libraries.from(upstreamData.map { objects.directoryProperty().convention(target, it.libDir).asFileTree })
+                mcLibraries.pathProvider(upstreamData.map { it.libFile })
+            }
+
+            generateMergedMappings {
+                vanillaJar.set(filterVanillaJar.flatMap { it.outputJar })
+                mojangMappedJar.set(filterMojangMappedJar.flatMap { it.outputJar })
+                libraries.from(upstreamData.map { objects.directoryProperty().convention(target, it.libDir).asFileTree })
+                syntheticMethods.set(inspectVanillaJar.flatMap { it.syntheticMethods })
+
+                mojangYarnMappings.pathProvider(upstreamData.map { it.sourceMappings })
+            }
+
+            remapJar {
+                inputJar.set(filterMojangMappedJar.flatMap { it.outputJar })
+            }
+
+            copyResources {
+                vanillaJar.pathProvider(upstreamData.map { it.vanillaJar })
+            }
+
+            decompileJar {
+                libraries.from(upstreamData.map { objects.directoryProperty().convention(target, it.libDir).asFileTree })
+            }
+
             mergeReobfMappingsPatches {
                 inputMappings.pathProvider(upstreamData.map { it.reobfMappingsPatch })
             }
@@ -146,7 +232,8 @@ class PaperweightPatcher : Plugin<Project> {
             for (upstream in patcher.upstreams) {
                 for (patchTask in upstream.patchTasks) {
                     patchTask.patchTask {
-                        sourceMcDevJar.convention(target, upstreamData.map { it.decompiledJar })
+                        vanillaJar.convention(target, upstreamData.map{ it.vanillaJar })
+                        sourceMcDevJar.convention(target, decompileJar.map { it.outputJar.path })
                         mcLibrariesDir.convention(target, upstreamData.map { it.libSourceDir })
                     }
                 }
@@ -169,7 +256,7 @@ class PaperweightPatcher : Plugin<Project> {
                 patcher.serverProject,
                 upstreamData.map { it.mcVersion },
                 upstreamData.map { it.vanillaJar },
-                upstreamData.map { it.decompiledJar },
+                decompileJar.map { it.outputJar.path },
                 upstreamData.map { it.libFile },
                 upstreamData.map { it.accessTransform }
             ) {
@@ -180,19 +267,19 @@ class PaperweightPatcher : Plugin<Project> {
                 paramMappingsUrl.set(upstreamData.map { it.paramMappings.url })
             }
 
-            val (_, reobfJar) = serverProj.setupServerProject(
+            if(!serverProj.setupPatcherProject(
                 target,
-                upstreamData.map { it.remappedJar },
-                upstreamData.map { it.decompiledJar },
+                copyResources.map { it.outputJar.path },
+                decompileJar.map { it.outputJar.path },
                 patcher.mcDevSourceDir.path,
-                upstreamData.map { it.libFile },
-                mergedReobfPackagesToFix,
-                patchReobfMappings.flatMap { it.outputMappings }
-            ) ?: return@afterEvaluate
+                upstreamData.map { it.libFile }
+            )) {
+                return@afterEvaluate
+            }
 
             val generatePaperclipPatch by target.tasks.registering<GeneratePaperclipPatch> {
                 originalJar.pathProvider(upstreamData.map { it.vanillaJar })
-                patchedJar.set(reobfJar.flatMap { it.outputJar })
+                patchedJar.set(serverProj.tasks.named("shadowJar", Jar::class).flatMap { it.archiveFile })
                 mcVersion.set(upstreamData.map { it.mcVersion })
             }
 
@@ -259,8 +346,14 @@ class PaperweightPatcher : Plugin<Project> {
 
             if (cloneTask != null) {
                 upstreamDir.convention(cloneTask.flatMap { it.outputDir.dir(config.upstreamDirPath) })
+                config.apiSourceDirPath.orNull?.let { apiSourceDir.convention(cloneTask.flatMap { it.outputDir.dir(config.apiSourceDirPath) }) }
+                config.serverSourceDirPath.orNull?.let{ remapSourceDir.convention(cloneTask.flatMap { it.outputDir.dir(config.serverSourceDirPath) }) }
             } else {
                 upstreamDir.convention(config.upstreamDir)
+                // The specific Upstream Directory isn't guaranteed to be in the root directory if the
+                // project is configured like this, as much as I would like to assume it is
+                // config.apiSourceDirPath.orNull?.let { config.upstreamDir.path.parent.resolve(config.apiSourceDirPath.get()) }
+                // config.serverSourceDirPath.orNull?.let { config.upstreamDir.path.parent.resolve(config.serverSourceDirPath.get()) }
             }
 
             patchDir.convention(config.patchDir.fileExists(project))

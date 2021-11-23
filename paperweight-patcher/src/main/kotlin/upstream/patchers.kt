@@ -61,6 +61,8 @@ open class DefaultRepoPatcherUpstream(
             }
 
             register("server") {
+                apiSourceDirPath.convention(config.apiSourceDirPath)
+                serverSourceDirPath.convention(config.serverSourceDirPath)
                 importMcDev.convention(true)
                 upstreamDirPath.convention(config.serverSourceDirPath)
                 patchDir.convention(config.serverPatchDir)
