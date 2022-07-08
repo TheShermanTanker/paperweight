@@ -45,6 +45,8 @@ open class DefaultPatchTaskConfig @Inject constructor(
     override val outputDir: DirectoryProperty = objects.directoryProperty()
     override val isBareDirectory: Property<Boolean> = objects.property<Boolean>().convention(false)
     override val importMcDev: Property<Boolean> = objects.property<Boolean>().convention(false)
+    override val apiSourceDirPath: Property<String> = objects.property()
+    override val apiSourceDir: DirectoryProperty = objects.directoryProperty()
 
     override val patchTaskName: String
         get() = "apply${name.capitalize()}Patches"

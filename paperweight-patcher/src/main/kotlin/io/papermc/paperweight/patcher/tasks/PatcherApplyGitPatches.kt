@@ -28,18 +28,19 @@ import io.papermc.paperweight.util.constants.*
 import java.nio.file.Path
 import javax.inject.Inject
 import kotlin.io.path.*
+import org.gradle.api.Project
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.Provider
 import org.gradle.api.provider.ProviderFactory
-import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.InputDirectory
-import org.gradle.api.tasks.InputFile
-import org.gradle.api.tasks.Optional
-import org.gradle.api.tasks.OutputDirectory
-import org.gradle.api.tasks.TaskAction
-
-abstract class PatcherApplyGitPatches : ControllableOutputTask() {
+import org.gradle.api.tasks.*
+import org.gradle.jvm.toolchain.JavaLauncher
+import org.gradle.kotlin.dsl.*
+import org.gradle.workers.WorkerExecutor
+abstract class PatcherApplyGitPatches : ControllableOutputTask(), JavaLauncherTaskBase {
 
     @get:InputDirectory
     abstract val upstreamDir: DirectoryProperty
@@ -56,6 +57,30 @@ abstract class PatcherApplyGitPatches : ControllableOutputTask() {
 
     @get:Input
     abstract val importMcDev: Property<Boolean>
+
+    @get:Optional
+    @get:InputFile
+    abstract val vanillaJar: RegularFileProperty
+
+    @get:Optional
+    @get:InputFile
+    abstract val remappedJar: RegularFileProperty
+
+    @get:Optional
+    @get:CompileClasspath
+    abstract val extraLibs: ConfigurableFileCollection
+
+    @get:Optional
+    @get:CompileClasspath
+    abstract val minecraftLibs: ConfigurableFileCollection
+
+    @get:Optional
+    @get:InputDirectory
+    abstract val apiSourceDir: DirectoryProperty
+
+    @get:Optional
+    @get:InputFile
+    abstract val mappings: RegularFileProperty
 
     @get:Optional
     @get:InputFile
@@ -85,7 +110,19 @@ abstract class PatcherApplyGitPatches : ControllableOutputTask() {
     @get:OutputDirectory
     abstract val mcDevSources: DirectoryProperty
 
+    @get:OutputFile
+    abstract val generatedAt: RegularFileProperty
+
+    @get:Internal
+    abstract val jvmargs: ListProperty<String>
+
+    @get:Inject
+    abstract val workerExecutor: WorkerExecutor
+
     override fun init() {
+        launcher.convention(defaultJavaLauncher(project))
+        jvmargs.convention(listOf("-Xmx2G"))
+        generatedAt.convention(defaultOutput("at"))
         upstreamBranch.convention("master")
         importMcDev.convention(false)
         printOutput.convention(true).finalizeValueOnRead()
@@ -133,6 +170,52 @@ abstract class PatcherApplyGitPatches : ControllableOutputTask() {
         git.disableAutoGpgSigningInRepo()
 
         val srcDir = output.resolve("src/main/java")
+        val testDir = output.resolve("src/test/java")
+
+        apiSourceDir.pathOrNull?.let {
+            mappings.pathOrNull?.let {
+                val queue = workerExecutor.processIsolation {
+                    forkOptions.jvmArgs(jvmargs.get())
+                    forkOptions.executable(launcher.get().executablePath.path.absolutePathString())
+                }
+
+                queue.submit(RemapUpstreamAction::class) {
+                    classpath.from(remappedJar.path)
+                    classpath.from(vanillaJar.path)
+                    classpath.from(apiSourceDir.dir("src/main/java").path)
+                    classpath.from(minecraftLibs.files.filter { it.toPath().isLibraryJar })
+                    if(!extraLibs.isEmpty) classpath.from(extraLibs.files.filter { it.toPath().isLibraryJar })
+
+                    remapDir.set(srcDir)
+                    mappings.set(this@PatcherApplyGitPatches.mappings.path)
+
+                    initialNamespace.set(DEOBF_NAMESPACE)
+                    targetNamespace.set("mojang+yarn+spigot")
+
+                    cacheDir.set(this@PatcherApplyGitPatches.layout.cache)
+                    generatedAtOutput.set(generatedAt.path)
+                }
+
+                queue.submit(RemapUpstreamAction::class) {
+                    classpath.from(remappedJar.path)
+                    classpath.from(vanillaJar.path)
+                    classpath.from(apiSourceDir.dir("src/main/java").path)
+                    classpath.from(minecraftLibs.files.filter { it.toPath().isLibraryJar })
+                    if(!extraLibs.isEmpty) classpath.from(extraLibs.files.filter { it.toPath().isLibraryJar })
+                    classpath.from(srcDir)
+
+                    remapDir.set(testDir)
+                    mappings.set(this@PatcherApplyGitPatches.mappings.path)
+
+                    initialNamespace.set(DEOBF_NAMESPACE)
+                    targetNamespace.set("mojang+yarn+spigot")
+
+                    cacheDir.set(this@PatcherApplyGitPatches.layout.cache)
+                }
+
+                queue.await()
+            }
+        }
 
         val patches = patchDir.pathOrNull?.listDirectoryEntries("*.patch") ?: listOf()
         val librarySources = ArrayList<Path>()
@@ -160,3 +243,6 @@ abstract class PatcherApplyGitPatches : ControllableOutputTask() {
         makeMcDevSrc(layout.cache, sourceMcDevJar.path, mcDevSources.path, outputDir.path, srcDir)
     }
 }
+
+private fun PatcherApplyGitPatches.defaultJavaLauncher(project: Project): Provider<JavaLauncher> =
+    javaToolchainService.defaultJavaLauncher(project)
